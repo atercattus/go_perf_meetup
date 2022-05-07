@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/valyala/fastjson"
 )
 
 func main() {
@@ -45,6 +48,10 @@ func addHandlers() {
 	addHandler_v2()
 }
 
+var (
+	parserPool fastjson.ParserPool
+)
+
 func addHandler_v1() {
 	http.HandleFunc("/v1", func(writer http.ResponseWriter, request *http.Request) {
 		buf, err := ioutil.ReadAll(request.Body)
@@ -54,14 +61,21 @@ func addHandler_v1() {
 			return
 		}
 
-		var req struct {
-			Names []string
-		}
+		var reqNames [][]byte
 
-		if err := json.Unmarshal(buf, &req); err != nil {
+		parser := parserPool.Get()
+		defer parserPool.Put(parser)
+
+		js, err := parser.ParseBytes(buf)
+		if err != nil {
 			writer.WriteHeader(http.StatusBadRequest)
 			log.Println(err)
 			return
+		}
+
+		for _, name := range js.GetArray("names") {
+			name := name.GetStringBytes()
+			reqNames = append(reqNames, name)
 		}
 
 		sleepRaw := request.URL.Query().Get("sleep")
@@ -69,7 +83,7 @@ func addHandler_v1() {
 			time.Sleep(sleep)
 		}
 
-		hello(req.Names, writer)
+		hello2(reqNames, writer)
 	})
 }
 
@@ -124,6 +138,18 @@ func listenAndServe(listenAddr string, gotAddr chan<- string) error {
 func hello(names []string, w io.Writer) {
 	for _, name := range names {
 		if strings.HasPrefix(name, "go") {
+			_, _ = fmt.Fprintln(w, "Hello", name)
+		}
+	}
+}
+
+var (
+	goStr = []byte("go")
+)
+
+func hello2(names [][]byte, w io.Writer) {
+	for _, name := range names {
+		if bytes.HasPrefix(name, goStr) {
 			_, _ = fmt.Fprintln(w, "Hello", name)
 		}
 	}
