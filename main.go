@@ -121,9 +121,13 @@ func listenAndServe(listenAddr string, gotAddr chan<- string) error {
 	return nil
 }
 
+var (
+	re = regexp.MustCompile("^go")
+)
+
 func hello(names []string, w io.Writer) {
 	for _, name := range names {
-		if ok, _ := regexp.Match("^go", []byte(name)); ok {
+		if re.Match([]byte(name)) {
 			_, _ = fmt.Fprintln(w, "Hello", name)
 		}
 	}
