@@ -127,7 +127,7 @@ var (
 
 func hello(names []string, w io.Writer) {
 	for _, name := range names {
-		if re.Match([]byte(name)) {
+		if re.MatchString(name) {
 			_, _ = fmt.Fprintln(w, "Hello", name)
 		}
 	}
