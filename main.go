@@ -11,7 +11,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"regexp"
+	"strings"
 	"time"
 )
 
@@ -121,13 +121,9 @@ func listenAndServe(listenAddr string, gotAddr chan<- string) error {
 	return nil
 }
 
-var (
-	re = regexp.MustCompile("^go")
-)
-
 func hello(names []string, w io.Writer) {
 	for _, name := range names {
-		if re.MatchString(name) {
+		if strings.HasPrefix(name, "go") {
 			_, _ = fmt.Fprintln(w, "Hello", name)
 		}
 	}
