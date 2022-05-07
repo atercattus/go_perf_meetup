@@ -79,8 +79,10 @@ func addHandler_v1() {
 		}
 
 		sleepRaw := request.URL.Query().Get("sleep")
-		if sleep, _ := time.ParseDuration(sleepRaw); sleep > 0 {
-			time.Sleep(sleep)
+		if sleepRaw != "" {
+			if sleep, _ := time.ParseDuration(sleepRaw); sleep > 0 {
+				time.Sleep(sleep)
+			}
 		}
 
 		hello2(reqNames, writer)
