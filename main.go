@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -116,8 +117,18 @@ func addHandler_v2() {
 	})
 }
 
+var (
+	reqNamesPool = sync.Pool{New: func() interface{} {
+		return &[][]byte{}
+	}}
+)
+
 func fasthttpV1Handler(ctx *fasthttp.RequestCtx) {
-	var reqNames [][]byte
+	reqNames := reqNamesPool.Get().(*[][]byte)
+	defer func() {
+		*reqNames = (*reqNames)[:0]
+		reqNamesPool.Put(reqNames)
+	}()
 
 	parser := parserPool.Get()
 	defer parserPool.Put(parser)
@@ -131,7 +142,7 @@ func fasthttpV1Handler(ctx *fasthttp.RequestCtx) {
 
 	for _, name := range js.GetArray("names") {
 		name := name.GetStringBytes()
-		reqNames = append(reqNames, name)
+		*reqNames = append(*reqNames, name)
 	}
 
 	sleepRaw := ctx.QueryArgs().Peek("sleep")
@@ -141,7 +152,7 @@ func fasthttpV1Handler(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	hello2(reqNames, ctx.Response.BodyWriter())
+	hello3(*reqNames, ctx)
 }
 
 func listenAndServe(listenAddr string, gotAddr chan<- string) error {
@@ -189,6 +200,16 @@ func hello2(names [][]byte, w io.Writer) {
 	for _, name := range names {
 		if bytes.HasPrefix(name, goStr) {
 			_, _ = fmt.Fprintf(w, "Hello %s\n", name)
+		}
+	}
+}
+
+func hello3(names [][]byte, ctx *fasthttp.RequestCtx) {
+	for _, name := range names {
+		if bytes.HasPrefix(name, goStr) {
+			_, _ = ctx.WriteString("Hello ")
+			_, _ = ctx.Write(name)
+			_, _ = ctx.WriteString("\n")
 		}
 	}
 }
