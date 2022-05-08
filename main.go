@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,7 +11,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"time"
 
@@ -52,7 +50,6 @@ func main() {
 
 func addHandlers() {
 	addHandler_v1()
-	addHandler_v2()
 }
 
 var (
@@ -93,27 +90,6 @@ func addHandler_v1() {
 		}
 
 		hello2(reqNames, writer)
-	})
-}
-
-func addHandler_v2() {
-	http.HandleFunc("/v2", func(writer http.ResponseWriter, request *http.Request) {
-		var req struct {
-			Names []string
-		}
-
-		if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
-			writer.WriteHeader(http.StatusBadRequest)
-			log.Println(err)
-			return
-		}
-
-		sleepRaw := request.URL.Query().Get("sleep")
-		if sleep, _ := time.ParseDuration(sleepRaw); sleep > 0 {
-			time.Sleep(sleep)
-		}
-
-		hello(req.Names, writer)
 	})
 }
 
@@ -182,14 +158,6 @@ func listenAndServe(listenAddr string, gotAddr chan<- string) error {
 	}
 
 	return nil
-}
-
-func hello(names []string, w io.Writer) {
-	for _, name := range names {
-		if strings.HasPrefix(name, "go") {
-			_, _ = fmt.Fprintln(w, "Hello", name)
-		}
-	}
 }
 
 var (
