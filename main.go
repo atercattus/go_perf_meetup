@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valyala/fasthttp"
 	"github.com/valyala/fastjson"
 )
 
@@ -36,6 +37,11 @@ func main() {
 	// }()
 
 	addHandlers()
+
+	go func() {
+		// For pprof
+		_ = http.ListenAndServe(":8081", nil)
+	}()
 
 	err := listenAndServe(":8080", make(chan string, 1))
 	if err != nil {
@@ -110,8 +116,38 @@ func addHandler_v2() {
 	})
 }
 
+func fasthttpV1Handler(ctx *fasthttp.RequestCtx) {
+	var reqNames [][]byte
+
+	parser := parserPool.Get()
+	defer parserPool.Put(parser)
+
+	js, err := parser.ParseBytes(ctx.Request.Body())
+	if err != nil {
+		ctx.Response.SetStatusCode(fasthttp.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+
+	for _, name := range js.GetArray("names") {
+		name := name.GetStringBytes()
+		reqNames = append(reqNames, name)
+	}
+
+	sleepRaw := ctx.QueryArgs().Peek("sleep")
+	if len(sleepRaw) > 0 {
+		if sleep, _ := time.ParseDuration(string(sleepRaw)); sleep > 0 {
+			time.Sleep(sleep)
+		}
+	}
+
+	hello2(reqNames, ctx.Response.BodyWriter())
+}
+
 func listenAndServe(listenAddr string, gotAddr chan<- string) error {
-	server := &http.Server{}
+	server := &fasthttp.Server{
+		Handler: fasthttpV1Handler,
+	}
 	ln, err := net.Listen("tcp4", listenAddr)
 	if err != nil {
 		close(gotAddr)
@@ -124,7 +160,7 @@ func listenAndServe(listenAddr string, gotAddr chan<- string) error {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt)
 		<-sig
-		_ = server.Close()
+		_ = server.Shutdown()
 	}()
 
 	log.Println("Listening", ln.Addr())
@@ -152,7 +188,7 @@ var (
 func hello2(names [][]byte, w io.Writer) {
 	for _, name := range names {
 		if bytes.HasPrefix(name, goStr) {
-			_, _ = fmt.Fprintln(w, "Hello", name)
+			_, _ = fmt.Fprintf(w, "Hello %s\n", name)
 		}
 	}
 }
